@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iPhone Sales Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c10;
+    --surface: #13131a;
+    --surface2: #1a1a24;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0eee8;
+    --text-muted: #8a8896;
+    --text-dim: #4a4858;
+    --accent: #c8f03c;
+    --accent2: #7b6ef6;
+    --accent3: #f03c6e;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  html { font-size: 16px; scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  .shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 2rem 4rem;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 3rem 0 2rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2.5rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .header-left {}
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .header-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-align: right;
+  }
+
+  /* ── Filters ── */
+  .filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .filter-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+
+  select {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a8896'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+    transition: border-color 0.2s;
+  }
+
+  select:hover, select:focus {
+    border-color: var(--accent);
+  }
+
+  .reset-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+  }
+
+  .reset-btn:hover {
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+
+  /* ── KPI Cards ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 2rem;
+  }
+
+  @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .kpi-grid { grid-template-columns: 1fr; } }
+
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.25s;
+  }
+
+  .kpi:hover { border-color: var(--border2); }
+
+  .kpi::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%; height: 2px;
+  }
+
+  .kpi:nth-child(1)::after { background: var(--accent); }
+  .kpi:nth-child(2)::after { background: var(--accent2); }
+  .kpi:nth-child(3)::after { background: var(--accent3); }
+  .kpi:nth-child(4)::after { background: #3cbdf0; }
+
+  .kpi-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .kpi-value {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  /* ── Chart Grid ── */
+  .charts-main {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .charts-mid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .charts-bottom {
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .charts-main, .charts-mid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: border-color 0.25s;
+  }
+
+  .card:hover { border-color: var(--border2); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .card-badge {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+  }
+
+  .chart-wrap {
+    position: relative;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── Top table ── */
+  .insights-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 2rem;
+  }
+
+  @media (max-width: 700px) { .insights-row { grid-template-columns: 1fr; } }
+
+  .insight-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .insight-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .insight-value {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .insight-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+    margin-top: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .footer-text {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+
+  .footer-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 8px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Entry animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .kpi { animation: fadeUp 0.5s ease both; }
+  .kpi:nth-child(1) { animation-delay: 0.05s; }
+  .kpi:nth-child(2) { animation-delay: 0.1s; }
+  .kpi:nth-child(3) { animation-delay: 0.15s; }
+  .kpi:nth-child(4) { animation-delay: 0.2s; }
+
+  .card { animation: fadeUp 0.5s ease both; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="header-left">
+      <div class="eyebrow">Sales Intelligence Report</div>
+      <h1>iPhone <span>Sales</span><br>Dashboard</h1>
+    </div>
+    <div class="header-meta">
+      100 orders &nbsp;/&nbsp; 6 markets<br>
+      Jan – May 2024
+    </div>
+  </header>
+
+  <!-- Filters -->
+  <div class="filters">
+    <span class="filter-label">Filter</span>
+    <select id="filterCountry" onchange="update()">
+      <option value="">All countries</option>
+    </select>
+    <select id="filterModel" onchange="update()">
+      <option value="">All models</option>
+    </select>
+    <select id="filterPayment" onchange="update()">
+      <option value="">All payments</option>
+    </select>
+    <button class="reset-btn" onclick="resetFilters()">Reset</button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Insights strip -->
+  <div class="insights-row" id="insightsRow"></div>
+
+  <!-- Charts -->
+  <div class="charts-main">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Revenue by month</span>
+        <span class="card-badge" id="monthBadge"></span>
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="monthChart" role="img" aria-label="Monthly revenue bar chart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Payment methods</span>
+      </div>
+      <div class="legend" id="payLegend"></div>
+      <div class="chart-wrap" style="height:180px">
+        <canvas id="payChart" role="img" aria-label="Payment method donut chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-mid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Revenue by country</span>
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="countryChart" role="img" aria-label="Revenue by country bar chart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Sales by color</span>
+      </div>
+      <div class="legend" id="colorLegend"></div>
+      <div class="chart-wrap" style="height:180px">
+        <canvas id="colorChart" role="img" aria-label="Sales by color donut chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-bottom">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Revenue by iPhone model</span>
+        <span class="card-badge" id="modelBadge"></span>
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="modelChart" role="img" aria-label="Revenue by model bar chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-text"><span class="footer-dot"></span>Live — data filtered in real time</div>
+    <div class="footer-text">iPhone Sales Report &nbsp;·&nbsp; 2024</div>
+  </footer>
+</div>
+
+<script>
+const raw = [
+  {country:'USA',model:'iPhone 13',color:'Purple',qty:5,month:'Jan',payment:'Debit Card',total:9085},
+  {country:'Canada',model:'iPhone 12',color:'Blue',qty:1,month:'Jan',payment:'PayPal',total:998},
+  {country:'Canada',model:'iPhone 15 Pro Max',color:'Black',qty:5,month:'Dec',payment:'Credit Card',total:4380},
+  {country:'USA',model:'iPhone 15 Pro Max',color:'Black',qty:2,month:'Jan',payment:'Debit Card',total:2580},
+  {country:'USA',model:'iPhone 15',color:'Blue',qty:3,month:'Dec',payment:'Debit Card',total:3276},
+  {country:'UAE',model:'iPhone 14 Pro',color:'Red',qty:5,month:'Jan',payment:'Debit Card',total:9695},
+  {country:'Germany',model:'iPhone 14 Pro',color:'Blue',qty:1,month:'Jan',payment:'Debit Card',total:1798},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'Purple',qty:3,month:'Jan',payment:'Debit Card',total:5424},
+  {country:'UAE',model:'iPhone 12',color:'Purple',qty:2,month:'Jan',payment:'Debit Card',total:2762},
+  {country:'Pakistan',model:'iPhone 14 Pro',color:'Red',qty:5,month:'Jan',payment:'Debit Card',total:8350},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'White',qty:5,month:'Dec',payment:'PayPal',total:9285},
+  {country:'USA',model:'iPhone 14',color:'Black',qty:3,month:'Jan',payment:'Cash',total:4716},
+  {country:'Germany',model:'iPhone 12',color:'Blue',qty:3,month:'Jan',payment:'PayPal',total:5604},
+  {country:'USA',model:'iPhone 12',color:'Black',qty:3,month:'Dec',payment:'Credit Card',total:5229},
+  {country:'UAE',model:'iPhone 14 Pro',color:'Blue',qty:1,month:'Dec',payment:'Credit Card',total:1544},
+  {country:'UAE',model:'iPhone 12',color:'Blue',qty:4,month:'Feb',payment:'Debit Card',total:7276},
+  {country:'Germany',model:'iPhone 13',color:'Red',qty:5,month:'Apr',payment:'PayPal',total:9960},
+  {country:'Canada',model:'iPhone 14 Pro',color:'Red',qty:2,month:'Feb',payment:'PayPal',total:2006},
+  {country:'UAE',model:'iPhone 13',color:'Purple',qty:1,month:'Feb',payment:'Debit Card',total:1010},
+  {country:'UAE',model:'iPhone 15',color:'Purple',qty:3,month:'Jan',payment:'Debit Card',total:4764},
+  {country:'Pakistan',model:'iPhone 15',color:'Red',qty:3,month:'Feb',payment:'Cash',total:2226},
+  {country:'Pakistan',model:'iPhone 15',color:'Black',qty:4,month:'Jan',payment:'PayPal',total:6508},
+  {country:'USA',model:'iPhone 15',color:'Red',qty:5,month:'Mar',payment:'Cash',total:9820},
+  {country:'UK',model:'iPhone 15',color:'White',qty:4,month:'Nov',payment:'Cash',total:3268},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'Purple',qty:5,month:'Dec',payment:'Debit Card',total:7855},
+  {country:'UAE',model:'iPhone 14',color:'Red',qty:3,month:'Jan',payment:'Debit Card',total:3906},
+  {country:'USA',model:'iPhone 13',color:'White',qty:5,month:'Dec',payment:'Cash',total:5300},
+  {country:'UK',model:'iPhone 13',color:'Blue',qty:4,month:'Dec',payment:'Credit Card',total:7516},
+  {country:'Canada',model:'iPhone 14 Pro',color:'Red',qty:3,month:'Jan',payment:'Debit Card',total:5889},
+  {country:'Canada',model:'iPhone 14',color:'Blue',qty:5,month:'Dec',payment:'Debit Card',total:8365},
+  {country:'UAE',model:'iPhone 13',color:'Purple',qty:5,month:'Jan',payment:'Debit Card',total:5675},
+  {country:'USA',model:'iPhone 15 Pro Max',color:'Blue',qty:5,month:'Feb',payment:'PayPal',total:7750},
+  {country:'Canada',model:'iPhone 14',color:'Blue',qty:5,month:'Dec',payment:'PayPal',total:8230},
+  {country:'USA',model:'iPhone 14 Pro',color:'Red',qty:4,month:'Feb',payment:'Debit Card',total:6236},
+  {country:'Canada',model:'iPhone 14 Pro',color:'White',qty:5,month:'Nov',payment:'Cash',total:8965},
+  {country:'USA',model:'iPhone 12',color:'Blue',qty:5,month:'Feb',payment:'Credit Card',total:5150},
+  {country:'Canada',model:'iPhone 14 Pro',color:'Red',qty:2,month:'Mar',payment:'Credit Card',total:3842},
+  {country:'UAE',model:'iPhone 14 Pro',color:'Purple',qty:1,month:'Mar',payment:'Credit Card',total:1674},
+  {country:'Canada',model:'iPhone 15 Pro Max',color:'Red',qty:1,month:'Dec',payment:'Credit Card',total:1218},
+  {country:'UAE',model:'iPhone 15 Pro Max',color:'Purple',qty:4,month:'Apr',payment:'Credit Card',total:4136},
+  {country:'UK',model:'iPhone 15',color:'Black',qty:3,month:'Jan',payment:'Credit Card',total:4899},
+  {country:'UK',model:'iPhone 15',color:'Black',qty:4,month:'Dec',payment:'Debit Card',total:2880},
+  {country:'UAE',model:'iPhone 15',color:'Red',qty:2,month:'Jan',payment:'Credit Card',total:2476},
+  {country:'USA',model:'iPhone 13',color:'White',qty:4,month:'Nov',payment:'Debit Card',total:7116},
+  {country:'UK',model:'iPhone 13',color:'Purple',qty:5,month:'Mar',payment:'Debit Card',total:8335},
+  {country:'Germany',model:'iPhone 15 Pro Max',color:'Blue',qty:1,month:'Nov',payment:'PayPal',total:1094},
+  {country:'USA',model:'iPhone 12',color:'White',qty:5,month:'Nov',payment:'PayPal',total:5600},
+  {country:'USA',model:'iPhone 14',color:'Black',qty:5,month:'Jan',payment:'Cash',total:8930},
+  {country:'Canada',model:'iPhone 14',color:'Black',qty:1,month:'Jan',payment:'Debit Card',total:1199},
+  {country:'Canada',model:'iPhone 14 Pro',color:'Blue',qty:1,month:'Nov',payment:'Cash',total:733},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'Blue',qty:5,month:'Dec',payment:'Credit Card',total:5565},
+  {country:'Pakistan',model:'iPhone 14',color:'Blue',qty:5,month:'Feb',payment:'Debit Card',total:3820},
+  {country:'USA',model:'iPhone 14 Pro',color:'Black',qty:1,month:'Jan',payment:'PayPal',total:1959},
+  {country:'UK',model:'iPhone 14',color:'White',qty:1,month:'Apr',payment:'Credit Card',total:1829},
+  {country:'Pakistan',model:'iPhone 14 Pro',color:'Blue',qty:2,month:'Mar',payment:'PayPal',total:1798},
+  {country:'USA',model:'iPhone 15',color:'Black',qty:5,month:'Nov',payment:'Debit Card',total:6250},
+  {country:'Pakistan',model:'iPhone 14 Pro',color:'Blue',qty:1,month:'Apr',payment:'Debit Card',total:945},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'Purple',qty:5,month:'Mar',payment:'Debit Card',total:8760},
+  {country:'Pakistan',model:'iPhone 14 Pro',color:'Red',qty:4,month:'Mar',payment:'Debit Card',total:7636},
+  {country:'Germany',model:'iPhone 14 Pro',color:'Blue',qty:5,month:'Nov',payment:'Credit Card',total:8570},
+  {country:'UAE',model:'iPhone 15',color:'Black',qty:5,month:'Jan',payment:'Debit Card',total:7595},
+  {country:'Canada',model:'iPhone 13',color:'Purple',qty:4,month:'Feb',payment:'PayPal',total:7076},
+  {country:'Canada',model:'iPhone 15 Pro Max',color:'White',qty:5,month:'Jan',payment:'Credit Card',total:8220},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'Red',qty:2,month:'Dec',payment:'Cash',total:3982},
+  {country:'Canada',model:'iPhone 14',color:'White',qty:3,month:'Nov',payment:'Debit Card',total:5118},
+  {country:'USA',model:'iPhone 14',color:'White',qty:1,month:'Jan',payment:'Debit Card',total:1884},
+  {country:'Canada',model:'iPhone 14 Pro',color:'Blue',qty:3,month:'Apr',payment:'Debit Card',total:3081},
+  {country:'Pakistan',model:'iPhone 15 Pro Max',color:'Black',qty:2,month:'Feb',payment:'Credit Card',total:1576},
+  {country:'Germany',model:'iPhone 14 Pro',color:'White',qty:3,month:'Dec',payment:'PayPal',total:2388},
+  {country:'Canada',model:'iPhone 14 Pro',color:'Blue',qty:4,month:'Nov',payment:'Credit Card',total:7316},
+  {country:'UK',model:'iPhone 12',color:'Purple',qty:2,month:'Nov',payment:'Cash',total:3954},
+  {country:'UAE',model:'iPhone 12',color:'Red',qty:5,month:'Dec',payment:'Debit Card',total:9820},
+  {country:'USA',model:'iPhone 14 Pro',color:'Red',qty:2,month:'Dec',payment:'Cash',total:3258},
+  {country:'Germany',model:'iPhone 15 Pro Max',color:'White',qty:1,month:'Apr',payment:'PayPal',total:1987},
+  {country:'Germany',model:'iPhone 14',color:'Blue',qty:4,month:'Nov',payment:'Cash',total:6188},
+  {country:'UK',model:'iPhone 14 Pro',color:'Red',qty:5,month:'Mar',payment:'Cash',total:9615},
+  {country:'UAE',model:'iPhone 14 Pro',color:'Blue',qty:2,month:'Jan',payment:'PayPal',total:2954},
+  {country:'Pakistan',model:'iPhone 13',color:'Purple',qty:4,month:'Dec',payment:'Cash',total:5856},
+  {country:'USA',model:'iPhone 15',color:'Purple',qty:3,month:'Jan',payment:'Credit Card',total:5370},
+  {country:'USA',model:'iPhone 15',color:'Purple',qty:4,month:'Jan',payment:'Debit Card',total:7276},
+  {country:'Pakistan',model:'iPhone 13',color:'Purple',qty:5,month:'Feb',payment:'Credit Card',total:7895},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'Blue',qty:1,month:'Jan',payment:'Debit Card',total:756},
+  {country:'UK',model:'iPhone 14 Pro',color:'White',qty:3,month:'Feb',payment:'Cash',total:3495},
+  {country:'Germany',model:'iPhone 13',color:'Red',qty:5,month:'Jan',payment:'Cash',total:6145},
+  {country:'UK',model:'iPhone 12',color:'White',qty:4,month:'Mar',payment:'Cash',total:6624},
+  {country:'Germany',model:'iPhone 12',color:'Black',qty:2,month:'Mar',payment:'Cash',total:1900},
+  {country:'Canada',model:'iPhone 15',color:'White',qty:1,month:'Nov',payment:'PayPal',total:1903},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'Purple',qty:5,month:'Dec',payment:'Cash',total:3590},
+  {country:'USA',model:'iPhone 13',color:'White',qty:3,month:'Nov',payment:'Debit Card',total:3747},
+  {country:'USA',model:'iPhone 12',color:'White',qty:3,month:'Jan',payment:'Debit Card',total:2661},
+  {country:'UAE',model:'iPhone 15',color:'Red',qty:5,month:'Jan',payment:'PayPal',total:6785},
+  {country:'UAE',model:'iPhone 15 Pro Max',color:'White',qty:3,month:'Dec',payment:'Credit Card',total:4083},
+  {country:'UK',model:'iPhone 12',color:'Black',qty:3,month:'Dec',payment:'Credit Card',total:5913},
+  {country:'USA',model:'iPhone 15 Pro Max',color:'White',qty:1,month:'Jan',payment:'Credit Card',total:1622},
+  {country:'Canada',model:'iPhone 13',color:'White',qty:4,month:'Nov',payment:'Credit Card',total:5552},
+  {country:'UAE',model:'iPhone 14 Pro',color:'Blue',qty:1,month:'Feb',payment:'Credit Card',total:1743},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'White',qty:3,month:'Dec',payment:'Credit Card',total:5013},
+  {country:'UK',model:'iPhone 15 Pro Max',color:'White',qty:4,month:'Nov',payment:'Debit Card',total:4500},
+  {country:'Germany',model:'iPhone 15 Pro Max',color:'Purple',qty:5,month:'Dec',payment:'Debit Card',total:7700},
+  {country:'UK',model:'iPhone 15',color:'Blue',qty:3,month:'Jan',payment:'Debit Card',total:4647},
+];
+
+const MONTHS_ORDER = ['Jan','Feb','Mar','Apr','May','Nov','Dec'];
+const COLOR_MAP = { Blue:'#378ADD', Purple:'#7b6ef6', Red:'#f03c6e', White:'#c8c8be', Black:'#555560' };
+const PAY_MAP = { 'Debit Card':'#c8f03c', 'Credit Card':'#7b6ef6', 'Cash':'#f0a03c', 'PayPal':'#3cbdf0' };
+const COUNTRY_COLORS = ['#c8f03c','#7b6ef6','#f03c6e','#3cbdf0','#f0a03c','#c8c8be'];
+const MODEL_COLORS = ['#c8f03c','#7b6ef6','#f03c6e','#3cbdf0','#f0a03c','#8df0c8','#f0c83c'];
+
+let charts = {};
+
+function groupBy(arr, key, val='total') {
+  const out = {};
+  arr.forEach(r => { out[r[key]] = (out[r[key]]||0) + r[val]; });
+  return out;
+}
+
+function getFiltered() {
+  const c = document.getElementById('filterCountry').value;
+  const m = document.getElementById('filterModel').value;
+  const p = document.getElementById('filterPayment').value;
+  return raw.filter(r => (!c||r.country===c)&&(!m||r.model===m)&&(!p||r.payment===p));
+}
+
+function makeLegend(el, keys, colorMap) {
+  el.innerHTML = keys.map(k =>
+    `<div class="legend-item"><span class="swatch" style="background:${colorMap[k]||'#666'}"></span>${k}</div>`
+  ).join('');
+}
+
+function makeChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, config);
+}
+
+const gridColor = 'rgba(255,255,255,0.05)';
+const tickColor = '#4a4858';
+const baseOpts = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: {
+    backgroundColor: '#1a1a24',
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    titleColor: '#f0eee8',
+    bodyColor: '#8a8896',
+    titleFont: { family: "'Syne', sans-serif", weight: '600', size: 12 },
+    bodyFont: { family: "'DM Mono', monospace", size: 11 },
+    callbacks: { label: ctx => ' $' + ctx.raw.toLocaleString() }
+  }},
+};
+
+function update() {
+  const data = getFiltered();
+  const total = data.reduce((s,r)=>s+r.total,0);
+  const orders = data.length;
+  const units = data.reduce((s,r)=>s+r.qty,0);
+  const avg = orders ? Math.round(total/orders) : 0;
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total revenue</div><div class="kpi-value">$${total.toLocaleString()}</div></div>
+    <div class="kpi"><div class="kpi-label">Orders</div><div class="kpi-value">${orders}</div></div>
+    <div class="kpi"><div class="kpi-label">Units sold</div><div class="kpi-value">${units}</div></div>
+    <div class="kpi"><div class="kpi-label">Avg order value</div><div class="kpi-value">$${avg.toLocaleString()}</div></div>
+  `;
+
+  // Insights
+  const byCountry = groupBy(data, 'country');
+  const topCountry = Object.entries(byCountry).sort((a,b)=>b[1]-a[1])[0];
+  const byModel = groupBy(data, 'model');
+  const topModel = Object.entries(byModel).sort((a,b)=>b[1]-a[1])[0];
+  const byPay = groupBy(data, 'payment', 'qty');
+  const topPay = Object.entries(byPay).sort((a,b)=>b[1]-a[1])[0];
+
+  document.getElementById('insightsRow').innerHTML = `
+    <div class="insight-card">
+      <div class="insight-label">Top market</div>
+      <div class="insight-value">${topCountry ? topCountry[0] : '—'}</div>
+      <div class="insight-sub">${topCountry ? '$'+topCountry[1].toLocaleString()+' revenue' : ''}</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-label">Best-selling model</div>
+      <div class="insight-value">${topModel ? topModel[0] : '—'}</div>
+      <div class="insight-sub">${topModel ? '$'+topModel[1].toLocaleString()+' revenue' : ''}</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-label">Preferred payment</div>
+      <div class="insight-value">${topPay ? topPay[0] : '—'}</div>
+      <div class="insight-sub">${topPay ? topPay[1]+' transactions' : ''}</div>
+    </div>
+  `;
+
+  // Monthly
+  const byMonth = groupBy(data, 'month');
+  const mLabels = MONTHS_ORDER.filter(m => byMonth[m]);
+  makeChart('monthChart', { ...baseOpts, type: 'bar', data: {
+    labels: mLabels,
+    datasets: [{ data: mLabels.map(m=>byMonth[m]||0), backgroundColor: mLabels.map((_,i)=>i===mLabels.map(m=>byMonth[m]).indexOf(Math.max(...mLabels.map(m=>byMonth[m]||0)))? '#c8f03c':'rgba(200,240,60,0.25)'), borderRadius: 4, borderSkipped: false }]
+  }, options: { ...baseOpts, scales: { x:{ grid:{color:gridColor}, ticks:{color:tickColor,font:{family:"'DM Mono'",size:11}} }, y:{ grid:{color:gridColor}, ticks:{color:tickColor,font:{family:"'DM Mono'",size:11},callback:v=>'$'+Math.round(v/1000)+'k'} } } }});
+
+  // Payment
+  const byPayR = groupBy(data, 'payment');
+  const payKeys = Object.keys(byPayR);
+  makeLegend(document.getElementById('payLegend'), payKeys, PAY_MAP);
+  makeChart('payChart', { type:'doughnut', data:{
+    labels: payKeys,
+    datasets:[{ data: payKeys.map(k=>byPayR[k]), backgroundColor: payKeys.map(k=>PAY_MAP[k]||'#555'), borderWidth:0, hoverOffset:4 }]
+  }, options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#1a1a24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#f0eee8', bodyColor:'#8a8896', callbacks:{ label: ctx => ' $'+ctx.raw.toLocaleString() } } } }});
+
+  // Country
+  const cKeys = Object.keys(byCountry).sort((a,b)=>byCountry[b]-byCountry[a]);
+  makeChart('countryChart', { type:'bar', data:{
+    labels: cKeys,
+    datasets:[{ data:cKeys.map(k=>byCountry[k]), backgroundColor: cKeys.map((_,i)=>COUNTRY_COLORS[i%COUNTRY_COLORS.length]+'55'), borderColor: cKeys.map((_,i)=>COUNTRY_COLORS[i%COUNTRY_COLORS.length]), borderWidth:1, borderRadius:4 }]
+  }, options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#1a1a24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#f0eee8', bodyColor:'#8a8896', callbacks:{ label: ctx => ' $'+ctx.raw.toLocaleString() } } }, scales:{
+    x:{ grid:{color:gridColor}, ticks:{color:tickColor,font:{family:"'DM Mono'",size:11},callback:v=>'$'+Math.round(v/1000)+'k'} },
+    y:{ grid:{color:'transparent'}, ticks:{color:'#c8c8be',font:{family:"'DM Mono'",size:11}} }
+  }}});
+
+  // Color
+  const byColor = groupBy(data, 'color');
+  const colKeys = Object.keys(byColor);
+  makeLegend(document.getElementById('colorLegend'), colKeys, COLOR_MAP);
+  makeChart('colorChart', { type:'doughnut', data:{
+    labels: colKeys,
+    datasets:[{ data:colKeys.map(k=>byColor[k]), backgroundColor:colKeys.map(k=>COLOR_MAP[k]||'#555'), borderWidth:0, hoverOffset:4 }]
+  }, options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#1a1a24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#f0eee8', bodyColor:'#8a8896', callbacks:{ label: ctx => ' $'+ctx.raw.toLocaleString() } } } }});
+
+  // Model
+  const mKeys2 = Object.keys(byModel).sort((a,b)=>byModel[b]-byModel[a]);
+  document.getElementById('modelBadge').textContent = mKeys2[0] ? 'Top: '+mKeys2[0] : '';
+  makeChart('modelChart', { type:'bar', data:{
+    labels: mKeys2,
+    datasets:[{ data:mKeys2.map(k=>byModel[k]), backgroundColor: mKeys2.map((_,i)=>MODEL_COLORS[i%MODEL_COLORS.length]+'55'), borderColor: mKeys2.map((_,i)=>MODEL_COLORS[i%MODEL_COLORS.length]), borderWidth:1, borderRadius:4 }]
+  }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#1a1a24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#f0eee8', bodyColor:'#8a8896', callbacks:{ label: ctx => ' $'+ctx.raw.toLocaleString() } } }, scales:{
+    x:{ grid:{color:gridColor}, ticks:{color:tickColor,font:{family:"'DM Mono'",size:11},maxRotation:20,autoSkip:false} },
+    y:{ grid:{color:gridColor}, ticks:{color:tickColor,font:{family:"'DM Mono'",size:11},callback:v=>'$'+Math.round(v/1000)+'k'} }
+  }}});
+}
+
+function resetFilters() {
+  document.getElementById('filterCountry').value='';
+  document.getElementById('filterModel').value='';
+  document.getElementById('filterPayment').value='';
+  update();
+}
+
+function populateFilters() {
+  const countries = [...new Set(raw.map(r=>r.country))].sort();
+  const models = [...new Set(raw.map(r=>r.model))].sort();
+  const payments = [...new Set(raw.map(r=>r.payment))].sort();
+  const add = (sel, items) => items.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; document.getElementById(sel).appendChild(o); });
+  add('filterCountry', countries);
+  add('filterModel', models);
+  add('filterPayment', payments);
+}
+
+populateFilters();
+update();
+</script>
+</body>
+</html>
