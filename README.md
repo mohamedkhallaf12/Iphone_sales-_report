@@ -9,7 +9,7 @@ This project provides a comprehensive data analysis of iPhone sales. The goal is
 
 ## Project Structure
 * `iphone_sales_report.xlsx`: The dataset and the core analysis.
-* `iphone_sales_dashboard.html`: The interactive dashboard/report for quick view.
+* `iphone_sales_dashboard.html`: (https://mohamedkhallaf12.github.io/Iphone_sales-_report/iphone_sales_dashboard.html) : Click here to view the live interactive dashboard!
 * `README.md`: Project documentation.
 
 ## Key Insights (Sample)
